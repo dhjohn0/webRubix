@@ -25,7 +25,7 @@ varying lowp vec4 vColor;
 uniform sampler2D uSampler;
 
 void main(void) {
-  gl_FragColor = texture2D(uSampler, vTextureCoord) + vColor;
+  gl_FragColor = texture2D(uSampler, vTextureCoord) * vColor;
 }
 `;
 
@@ -116,9 +116,6 @@ export default class GlWindow {
     this.gl.enable(this.gl.DEPTH_TEST);
     this.gl.depthFunc(this.gl.LEQUAL);
 
-    this.gl.enable(this.gl.BLEND);
-    //this.gl.blendFunc(this.gl.GL_SRC_ALPHA, this.gl.GL_ONE_MINUS_SRC_ALPHA);
-
     // Draw the scene repeatedly
     const render = (now) => {
       if (typeof(this.draw) === 'function') {
@@ -160,36 +157,35 @@ export default class GlWindow {
   setMouseUp(callback) { this.mouseUp = callback; }
   setMouseMove(callback) { this.mouseMove = callback; }
 
+  createTexture(r, g, b, a) {
+    const texture = this.gl.createTexture();
+    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+
+    const pixel = new Uint8Array([r, g, b, a]);
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D, 0, this.gl.RGBA,
+      1, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE,
+      pixel
+    );
+
+    return texture;
+  }
+
   loadTexture(url) {
     function isPowerOf2(value) {
       return (value & (value - 1)) == 0;
     }
-    
-    const texture = this.gl.createTexture();
-    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-  
-    // Because images have to be download over the internet
-    // they might take a moment until they are ready.
-    // Until then put a single pixel in the texture so we can
-    // use it immediately. When the image has finished downloading
-    // we'll update the texture with the contents of the image.
-    const level = 0;
-    const internalFormat = this.gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const srcFormat = this.gl.RGBA;
-    const srcType = this.gl.UNSIGNED_BYTE;
-    const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
-    this.gl.texImage2D(this.gl.TEXTURE_2D, level, internalFormat,
-                  width, height, border, srcFormat, srcType,
-                  pixel);
+
+    const texture = this.createTexture(0, 0, 255, 255);
   
     const image = new Image();
     image.onload = () => {
       this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-      this.gl.texImage2D(this.gl.TEXTURE_2D, level, internalFormat,
-                    srcFormat, srcType, image);
+      this.gl.texImage2D(
+        this.gl.TEXTURE_2D, 0, this.gl.RGBA,
+        this.gl.RGBA, this.gl.UNSIGNED_BYTE,
+        image
+      );
   
       // WebGL1 has different requirements for power of 2 images
       // vs non power of 2 images so check if the image is a

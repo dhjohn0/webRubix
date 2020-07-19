@@ -24,6 +24,8 @@ function main() {
   window.Block = Block;
   window.cube = cube;
 
+  window.forceSelectMode = false;
+
   Cube.setSolver(new ByLayer());
 
   cubeCanvas = new CubeCanvas(cube, canvas);

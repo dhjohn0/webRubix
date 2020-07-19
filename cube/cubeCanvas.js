@@ -89,8 +89,11 @@ export default class CubeCanvas {
 
     CubeCanvas.initBuffers(this.gl);
     Block.initBuffers(this.gl);
-    this.texture = this.glWindow.loadTexture('texture.png');
-    Block.setTexture(this.texture);
+    this.textures = {
+      block: this.glWindow.loadTexture('texture.png'),
+      white: this.glWindow.createTexture(255, 255, 255, 255)
+    };
+    Block.setTextures(this.textures);
   }
 
   setMouseEnabled(flag) { this.mouseEnabled = flag; }
@@ -102,7 +105,7 @@ export default class CubeCanvas {
         y: e.offsetY,
         state: CubeCanvas.MOUSE_DOWN
       }
-
+      
       this.draw(this.gl, this.glWindow.programInfo, 0, true);
       var pixels = new Uint8Array(4);
       this.gl.readPixels(e.offsetX, this.canvas.height - e.offsetY, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
@@ -214,8 +217,10 @@ export default class CubeCanvas {
       this.mouse.x = e.offsetX;
       this.mouse.y = e.offsetY;
     }else if (this.mouseEnabled && !this.cube.isMoving() && this.selected) {
-      if (distance({x: this.mouse.x, y: this.mouse.y}, {x: e.offsetX, y: e.offsetY}) < CubeCanvas.DRAG_DEADZONE)
+      if (distance({x: this.mouse.x, y: this.mouse.y}, {x: e.offsetX, y: e.offsetY}) < CubeCanvas.DRAG_DEADZONE) {
+        this.selected.highlight = -1;
         return;
+      }
 
       const sel = {
         x: this.selected.block.getX(),
@@ -288,11 +293,16 @@ export default class CubeCanvas {
       programInfo.uniformLocations.projectionMatrix, false, this.projMatrix
     );
     
-    cube.draw(gl, programInfo, this.mvMatrix, selectMode);
+    cube.draw(gl, programInfo, this.mvMatrix, window.forceSelectMode || selectMode);
 
-    if (this.selected) {
+    if (!selectMode && this.selected) {
+      gl.enable(gl.BLEND);
+      gl.disable(gl.DEPTH_TEST);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.blendEquation(gl.FUNC_ADD);
+
       gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, Block.texture);
+      gl.bindTexture(gl.TEXTURE_2D, Block.textures.block);
       gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
       const offset = this.cube.isEditing() ? 2 : 1;
@@ -315,36 +325,36 @@ export default class CubeCanvas {
         mat4.rotate(matrix, matrix, 1.57079633, [1, 0, 0]);
       
       for (let i = 0; i < 4; i ++) {
-        if (this.selected.highlight === i) {
-          gl.uniformMatrix4fv(
-            programInfo.uniformLocations.modelViewMatrix, false, matrix
-          );
-          
-          gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.position);
-          gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexPosition,
-            3, gl.FLOAT,
+        gl.uniformMatrix4fv(
+          programInfo.uniformLocations.modelViewMatrix, false, matrix
+        );
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.position);
+        gl.vertexAttribPointer(
+          programInfo.attribLocations.vertexPosition,
+          3, gl.FLOAT,
+          false, 0, 0
+        );
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.texture);
+        gl.vertexAttribPointer(
+          programInfo.attribLocations.textureCoord,
+          2, gl.FLOAT,
+          false, 0, 0
+        );
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.colors[this.selected.highlight === i ? 'opaque' : 'transparent']);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexColor,
+            4, gl.FLOAT,
             false, 0, 0
-          );
-          gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.texture);
-          gl.vertexAttribPointer(
-            programInfo.attribLocations.textureCoord,
-            2, gl.FLOAT,
-            false, 0, 0
-          );
-          gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.color);
-          gl.vertexAttribPointer(
-              programInfo.attribLocations.vertexColor,
-              4, gl.FLOAT,
-              false, 0, 0
-          );
-          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, CubeCanvas.buffers.indices);
+        );
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, CubeCanvas.buffers.indices);
 
-          gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-        }
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
         mat4.rotate(matrix, matrix, 1.57079633, [0, 0, 1]);
       }
 
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST);
     }
   }
 
@@ -369,15 +379,27 @@ export default class CubeCanvas {
     gl.bindBuffer(gl.ARRAY_BUFFER, texBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texPos), gl.STATIC_DRAW);
 
-    const colorBuffer = gl.createBuffer();
+    const colorBuffers = {
+      opaque: gl.createBuffer(),
+      transparent: gl.createBuffer()
+    };
     const colorPack = [
-      0, 0, 0, 0,
-      0, 0, 0, 0,
-      0, 0, 0, 0,
-      0, 0, 0, 0
+      [
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 1
+      ],[
+        1, 1, 1, 0.2,
+        1, 1, 1, 0.2,
+        1, 1, 1, 0.2,
+        1, 1, 1, 0.2
+      ]
     ];
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorPack), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers.opaque);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorPack[0]), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers.transparent);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorPack[1]), gl.STATIC_DRAW);
 
     const indexBuffer = gl.createBuffer();
     const indices = [ 0, 1, 2,  0, 2, 3 ];
@@ -387,7 +409,7 @@ export default class CubeCanvas {
     this.buffers = {
       position: posBuffer,
       texture: texBuffer,
-      color: colorBuffer,
+      colors: colorBuffers,
       indices: indexBuffer
     };
   }

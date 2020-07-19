@@ -262,9 +262,9 @@ export default class Block {
     
     gl.activeTexture(gl.TEXTURE0);
     if (selectMode)
-      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.bindTexture(gl.TEXTURE_2D, Block.textures.white);
     else
-      gl.bindTexture(gl.TEXTURE_2D, Block.texture);
+      gl.bindTexture(gl.TEXTURE_2D, Block.textures.block);
     gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
     
     for (let i = 0; i < 6; i ++)
@@ -309,7 +309,7 @@ export default class Block {
       if (selectMode)
         gl.bindBuffer(gl.ARRAY_BUFFER, Block.buffers.colors[this.x][this.y][this.z][i]);
       else
-        gl.bindBuffer(gl.ARRAY_BUFFER, Block.buffers.colors[0][0][0][0]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, Block.buffers.whiteColor);
       gl.vertexAttribPointer(
           programInfo.attribLocations.vertexColor,
           4, gl.FLOAT,
@@ -327,7 +327,7 @@ export default class Block {
       0.0,
       ((x * 10) + y) / 100.0,
       ((z * 10) + f) / 100.0,
-      1
+      1.0
     ];
   }
 
@@ -402,6 +402,16 @@ export default class Block {
       });
     });
 
+    const whiteColorBuffer = gl.createBuffer();
+    const whiteColorPack = [
+      1, 1, 1, 1,
+      1, 1, 1, 1,
+      1, 1, 1, 1,
+      1, 1, 1, 1
+    ];
+    gl.bindBuffer(gl.ARRAY_BUFFER, whiteColorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(whiteColorPack), gl.STATIC_DRAW);
+
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
@@ -413,9 +423,10 @@ export default class Block {
       positions: posBuffers,
       textures: textureBuffers,
       colors: colorBuffers,
+      whiteColor: whiteColorBuffer,
       indices: indexBuffer
     };
   }
 
-  static setTexture(texture) { this.texture = texture; }
+  static setTextures(textures) { this.textures = textures; }
 }
