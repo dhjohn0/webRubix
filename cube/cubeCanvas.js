@@ -99,16 +99,23 @@ export default class CubeCanvas {
   setMouseEnabled(flag) { this.mouseEnabled = flag; }
 
   mouseDown = (e) => {
+    var rect = this.canvas.getBoundingClientRect();
+    let c = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
     if (this.mouseEnabled && !this.cube.isMoving()) {
       this.mouse = {
-        x: e.offsetX,
-        y: e.offsetY,
+        x: c.x,
+        y: c.y,
         state: CubeCanvas.MOUSE_DOWN
       }
+      console.log(this.mouse);
       
       this.draw(this.gl, this.glWindow.programInfo, 0, true);
       var pixels = new Uint8Array(4);
-      this.gl.readPixels(e.offsetX, this.canvas.height - e.offsetY, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
+      this.gl.readPixels(c.x, this.canvas.height - c.y, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
 
       let pick = Block.decodeColor(pixels);
       if (pick) {
@@ -126,11 +133,8 @@ export default class CubeCanvas {
   }
 
   mouseUp = (e) => {
-    this.mouse = {
-      x: e.offsetX,
-      y: e.offsetY,
-      state: CubeCanvas.MOUSE_UP
-    }
+    this.mouse.state = CubeCanvas.MOUSE_UP;
+
     if (this.mouseEnabled && !this.cube.isMoving() && this.selected) {
       if (this.selected.highlight >= 0) {
         this.cube.setSolving(false);
@@ -205,19 +209,27 @@ export default class CubeCanvas {
   }
 
   mouseMove = (e) => {
+    var rect = this.canvas.getBoundingClientRect();
+    let c = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
     if (!this.mouseEnabled || this.cube.isMoving() || !this.selected) {
       if (this.mouse.state === CubeCanvas.MOUSE_DOWN) {
-        this.rotation.x += e.offsetY - this.mouse.y;
+        this.rotation.x += c.y - this.mouse.y;
         if (this.rotation.x < -80) this.rotation.x = -80;
         if (this.rotation.x > 80) this.rotation.x = 80;
 
-        this.rotation.y = (this.rotation.y + e.offsetX - this.mouse.x) % 360;
+        this.rotation.y = (this.rotation.y + c.x - this.mouse.x) % 360;
       }
 
-      this.mouse.x = e.offsetX;
-      this.mouse.y = e.offsetY;
+      this.mouse.x = c.x;
+      this.mouse.y = c.y;
+
+      console.log(this.mouse);
     }else if (this.mouseEnabled && !this.cube.isMoving() && this.selected) {
-      if (distance({x: this.mouse.x, y: this.mouse.y}, {x: e.offsetX, y: e.offsetY}) < CubeCanvas.DRAG_DEADZONE) {
+      if (distance({x: this.mouse.x, y: this.mouse.y}, c) < CubeCanvas.DRAG_DEADZONE) {
         this.selected.highlight = -1;
         return;
       }
@@ -231,7 +243,7 @@ export default class CubeCanvas {
       const viewport = [0, 0, this.canvas.width, this.canvas.height];
       const angleCenter = project(sel, this.mvMatrix, this.projMatrix, viewport);
 
-      const mAngle = findAngle(e.offsetX - this.mouse.x, (this.canvas.height - e.offsetY) - (this.canvas.height - this.mouse.y));
+      const mAngle = findAngle(c.x - this.mouse.x, (this.canvas.height - c.y) - (this.canvas.height - this.mouse.y));
 
       let highlightTests = [];
       if (this.selected.face == 0) {

@@ -83,6 +83,10 @@ export default class GlWindow {
     canvas.onmouseup = this.onMouseUp;
     canvas.onmousemove = this.onMouseMove;
 
+    canvas.ontouchstart = this.onTouchDown;
+    canvas.ontouchend = this.onTouchUp;
+    canvas.ontouchmove = this.onTouchMove;
+
     // Initialize a shader program; this is where all the lighting
     // for the vertices and so forth is established.
     const shaderProgram = initShaderProgram(this.gl, VS_SOURCE, FS_SOURCE);
@@ -134,7 +138,7 @@ export default class GlWindow {
   resize = () => {
     this.canvas.width = $(this.canvas).parent().width();
     if ($(window).width() <= 992) 
-    this.canvas.height = window.innerHeight - $('#controls').height() - 15;
+    this.canvas.height = window.innerHeight / 2 - 15;
     else
       this.canvas.height = window.innerHeight - 15;
 
@@ -142,16 +146,37 @@ export default class GlWindow {
   }
 
   onMouseDown = (e) => {
+    e.preventDefault();
     if (this.mouseDown)
       return this.mouseDown(e);
   }
   onMouseUp = (e) => {
+    e.preventDefault();
     if (this.mouseUp)
       return this.mouseUp(e);
   }
   onMouseMove = (e) => {
+    e.preventDefault();
     if (this.mouseMove)
       return this.mouseMove(e);
+  }
+
+  onTouchDown = (e) => {
+    e.preventDefault();
+    if (this.mouseDown && e.touches.length)
+      this.mouseDown(e.touches[0]);
+  }
+
+  onTouchUp = (e) => {
+    e.preventDefault();
+    if (this.mouseUp)
+      return this.mouseUp(e);
+  }
+
+  onTouchMove = (e) => {
+    e.preventDefault();
+    if (this.mouseMove && e.touches.length)
+      return this.mouseMove(e.touches[0]);
   }
 
   setRender(draw) { this.draw = draw; }
