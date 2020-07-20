@@ -138,7 +138,7 @@ export default class GlWindow {
   resize = () => {
     this.canvas.width = $(this.canvas).parent().width();
     if ($(window).width() <= 992) 
-    this.canvas.height = window.innerHeight / 2 - 15;
+    this.canvas.height = window.innerHeight - $('#controls-header').height() - 15;
     else
       this.canvas.height = window.innerHeight - 15;
 
