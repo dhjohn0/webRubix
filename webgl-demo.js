@@ -3,9 +3,6 @@ import Block from './cube/block.js'
 import ByLayer from './cube/byLayer.js'
 import CubeCanvas from './cube/cubeCanvas.js'
 
-var cubeRotation = 0.0;
-
-var glWindow;
 var cube;
 var cubeCanvas;
 
@@ -30,25 +27,59 @@ function main() {
 
   cubeCanvas = new CubeCanvas(cube, canvas);
   
+  let state = 0;
+  let turns = 0;
   setInterval(() => {
+    if (!cube.isMoving()) {
+      if (state === 'solving') {
+        cube.setSolving(true);
+        if (!cube.runSolutionStep()) {
+          state = 0;
+        }
+      }else if (state === 'randomizing') {
+        if (turns <= 0)
+          state = 0;
+        
+        cube.setSolving(false);
+        cube.runMove([rand(3), rand(3), rand(2) === 1]);
+        turns --;
+      }else if (state === 'forwards') {
+        cube.setSolving(true);
+        cube.runSolutionStep();
+
+        state = 0;
+      }else if (state === 'backwards') {
+        cube.setSolving(true);
+        cube.runUndoStep();
+
+        state = 0;
+      }
+      cube.setEditing(state === 'editing');
+    }
+
     cube.act();
 
-    if (cube.isSolving() && cube.isSolved()) {
-      cube.setSolving(false);
-    }
+    $('#forwards-count').text(cube.getSolutionLength());
+    $('#backwards-count').text(cube.getUndoLength());
+    $('#step-forwards').prop('disabled', cube.getSolutionLength() <= 0 || state !== 0);
+    $('#step-backwards').prop('disabled', cube.getUndoLength() <= 0 || state !== 0);
+
+    $('#solve').text(state === 'solving' ? 'Stop' : 'Solve');
+    $('#solve').prop('disabled', (state !== 0 && state !== 'solving') || cube.getSolutionLength() <= 0);
+
+    $('#randomize').prop('disabled', state !== 0 && state !== 'randomizing');
+    $('#edit').prop('disabled', state !== 0 && state !== 'editing');
   }, 10);
 
   $("#step-forwards").click((e) => {
     e.preventDefault();
 
-    cube.setSolving(true);
-    cube.runSolutionStep();
+    if (state === 0) state = 'forwards';
   });
   $("#step-backwards").click((e) => {
     e.preventDefault();
 
-    cube.setSolving(true);
-    cube.runUndoStep();
+    if (state === 0) state = 'backwards';
   });
   $("#solve").click((e) => {
     e.preventDefault();
@@ -63,7 +94,10 @@ function main() {
   $("#edit").click((e) => {
     e.preventDefault();
 
-    cube.setEditing(!cube.isEditing());
+    if (state === 0)
+      state = 'editing';
+    else if (state === 'editing')
+      state = 0;
   });
   $("#speed").val(100 - cube.getAniDone());
   $("#speed").change((e) => {
@@ -73,36 +107,23 @@ function main() {
     cube.setAniDone(100 - parseInt(val));
   });
 
-  window.randomize = (turns) => {
-    
-    let pointer = setInterval(() => {
-      if (!cube.isMoving()) {
-        if (turns <= 0 || cube.isSolving()) {
-          clearInterval(pointer);
-          return;
-        }
-        cube.runMove([rand(3), rand(3), rand(2) === 1]);
-
-        turns --;
-      }
-    }, 10);
+  window.randomize = (t) => {
+    if (state === 0) {
+      state = 'randomizing';
+      turns = t;
+    }else if (state === 'randomizing')
+      state = 0;
   };
 
   window.solve = () => {
-    if (!cube.isSolvable()) {
-      alert('unsolvable');
-      return;
-    }
-    cube.setSolving(true);
-    let pointer = setInterval(() => {
-      if (!cube.isMoving()) {
-        if (cube.isSolved()) {
-          cube.setSolving(false);
-          clearInterval(pointer);
-          return;
-        }
-        cube.runSolutionStep();
+    if (state === 0) {
+      if (!cube.isSolvable()) {
+        alert('unsolvable');
+        return;
       }
-    }, 10);
+      state = 'solving';
+    }else if ( state === 'solving') {
+      state = 0;
+    }
   };
 }
