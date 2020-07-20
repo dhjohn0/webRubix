@@ -4,3 +4,6 @@ canvas {
 video {
 	display: none;
 }
+.no-padding {
+	padding: 0;
+}
