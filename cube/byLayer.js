@@ -491,6 +491,60 @@ export default class ByLayer extends Solver {
     return cube.getLog();
   }
 
+  areMovesEqual(a, b) {
+    return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+  }
+
+  invertMove(a) {
+    return [a[0], a[1], !a[2]];
+  }
+
+  transformTriples(moves) {
+    let altered = false;
+    for (let i = 2; i < moves.length; i ++) {
+      let move = moves[i];
+      if (this.areMovesEqual(move, moves[i-1]) && this.areMovesEqual(move, moves[i-2])) {
+        moves.splice(i - 2, 3, this.invertMove(move));
+        altered = true;
+        i = 1;
+      }
+    }
+  }
+
+  clearReversals(moves) {
+    let altered = false;
+    for (let i = 1; i < moves.length; i ++) {
+      let move = moves[i];
+      if (this.areMovesEqual(move, this.invertMove(moves[i-1]))) {
+        moves.splice(i - 1, 2);
+        altered = true;
+        i = 0;
+      }
+    }
+    return altered;
+  }
+
+  clearEndingSpins(moves) {
+    let i;
+    for (i = moves.length - 1; i >= 0; i --) {
+      if (moves[i][0] !== Cube.MOVE_ROT_X && moves[i][0] !== Cube.MOVE_ROT_Y && moves[i][0] !== Cube.MOVE_ROT_Z) {
+        i ++;
+        break;
+      }
+    }
+    moves.splice(i, moves.length - i);
+  }
+
+  optimize(moves) {
+    let loop = true;
+    while (loop) {
+      loop = false;
+      loop = this.transformTriples(moves) || loop;
+      loop = this.clearReversals(moves) || loop;
+    }
+    this.clearEndingSpins(moves);
+  }
+
   findSolution(cube) {
     let c = new Cube(cube);
     c.setSolving(true);
@@ -515,6 +569,8 @@ export default class ByLayer extends Solver {
     if (!c.isSolved()) {
       return [[9999, 9999, 9999]];
     }
+
+    this.optimize(moves);
 
     return moves;
   }
