@@ -278,29 +278,142 @@ export default class CubeCanvas {
     }
   }
   
-  draw = (gl, programInfo, deltaTime, selectMode = false) => {
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  drawArrowsOnCube(gl, programInfo, selectMode) {
+    if (!selectMode && this.selected) {
+      gl.enable(gl.BLEND);
+      gl.disable(gl.DEPTH_TEST);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.blendEquation(gl.FUNC_ADD);
 
-    // Create a perspective matrix
-    const fieldOfView = 45 * Math.PI / 180;   // in radians
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    const zNear = 0.1;
-    const zFar = 100.0;
-    this.projMatrix = mat4.create();
-    mat4.perspective(this.projMatrix, fieldOfView, aspect, zNear, zFar);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, Block.textures.block);
+      gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
-    this.mvMatrix = mat4.create();
-    mat4.translate(this.mvMatrix, this.mvMatrix, [-0.0, 0.0, -15.0]);
-    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.x / 360.0 * 6.28318531, [1, 0, 0]);
-    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.y / 360.0 * 6.28318531, [0, 1, 0]);
-    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.z / 360.0 * 6.28318531, [0, 0, 1]);
+      const offset = 1;
 
-    gl.uniformMatrix4fv(
-      programInfo.uniformLocations.projectionMatrix, false, this.projMatrix
-    );
-    
-    cube.draw(gl, programInfo, this.mvMatrix, window.forceSelectMode || selectMode);
+      let pick = { 
+        x: this.selected.block.getX(), 
+        y: this.selected.block.getY(), 
+        z: this.selected.block.getZ()
+      };
+      let centers = [];
+      let rotation = {
+        mult: 0,
+        vect: [0, 0, 0]
+      };
 
+      switch (this.selected.face) {
+        case Block.FACE_FRONT:
+          centers = [
+            [2, pick.y, 2],
+            [pick.x, 2, 2],
+            [0, pick.y, 2],
+            [pick.x, 0, 2]
+          ];
+          break;
+        case Block.FACE_RIGHT:
+          centers = [
+            [2, pick.y, 0],
+            [2, 2, pick.z],
+            [2, pick.y, 2],
+            [2, 0, pick.z]
+          ]
+          rotation = {
+            mult: 1,
+            vect: [0, 1, 0]
+          };
+          break;
+        case Block.FACE_BACK:
+          centers = [
+            [0, pick.y, 0],
+            [pick.x, 2, 0],
+            [2, pick.y, 0],
+            [pick.x, 0, 0]
+          ];
+          rotation = {
+            mult: 2,
+            vect: [0, 1, 0]
+          };
+          break;
+        case Block.FACE_LEFT:
+          centers = [
+            [0, pick.y, 2],
+            [0, 2, pick.z],
+            [0, pick.y, 0],
+            [0, 0, pick.z]
+          ]
+          rotation = {
+            mult: 3,
+            vect: [0, 1, 0]
+          };
+          break;
+        case Block.FACE_TOP:
+          centers = [
+            [2, 2, pick.z],
+            [pick.x, 2, 0],
+            [0, 2, pick.z],
+            [pick.x, 2, 2]
+          ];
+          rotation = {
+            mult: 3,
+            vect: [1, 0, 0]
+          };
+          break;
+        case Block.FACE_BOTTOM:
+          centers = [
+            [2, 0, pick.z],
+            [pick.x, 0, 2],
+            [0, 0, pick.z],
+            [pick.x, 0, 0]
+          ];
+          rotation = {
+            mult: 1,
+            vect: [1, 0, 0]
+          };
+          break;
+      }
+
+      centers.forEach((c, i) => {
+        let matrix = mat4.clone(this.mvMatrix);
+        mat4.translate(matrix, matrix, [
+          (c[0] - 1.0) * offset, (c[1] - 1.0) * offset, (c[2] - 1.0) * offset
+        ]);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.position);
+        gl.vertexAttribPointer(
+          programInfo.attribLocations.vertexPosition,
+          3, gl.FLOAT,
+          false, 0, 0
+        );
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.texture);
+        gl.vertexAttribPointer(
+          programInfo.attribLocations.textureCoord,
+          2, gl.FLOAT,
+          false, 0, 0
+        );
+        gl.bindBuffer(gl.ARRAY_BUFFER, CubeCanvas.buffers.colors[this.selected.highlight === i ? 'opaque' : 'transparent']);
+        gl.vertexAttribPointer(
+            programInfo.attribLocations.vertexColor,
+            4, gl.FLOAT,
+            false, 0, 0
+        );
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, CubeCanvas.buffers.indices);
+
+        mat4.rotate(matrix, matrix, 1.57079633 * rotation.mult, rotation.vect);
+        mat4.rotate(matrix, matrix, 1.57079633 * i, [0, 0, 1]);
+
+        gl.uniformMatrix4fv(
+          programInfo.uniformLocations.modelViewMatrix, false, matrix
+        );
+        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+      });
+
+      gl.disable(gl.BLEND);
+      gl.enable(gl.DEPTH_TEST);
+    }
+  }
+
+  drawArrowsOnBlock(gl, programInfo, selectMode) {
     if (!selectMode && this.selected) {
       gl.enable(gl.BLEND);
       gl.disable(gl.DEPTH_TEST);
@@ -364,13 +477,42 @@ export default class CubeCanvas {
     }
   }
 
+  draw = (gl, programInfo, deltaTime, selectMode = false) => {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // Create a perspective matrix
+    const fieldOfView = 45 * Math.PI / 180;   // in radians
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const zNear = 0.1;
+    const zFar = 100.0;
+    this.projMatrix = mat4.create();
+    mat4.perspective(this.projMatrix, fieldOfView, aspect, zNear, zFar);
+
+    this.mvMatrix = mat4.create();
+    mat4.translate(this.mvMatrix, this.mvMatrix, [-0.0, 0.0, -15.0]);
+    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.x / 360.0 * 6.28318531, [1, 0, 0]);
+    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.y / 360.0 * 6.28318531, [0, 1, 0]);
+    mat4.rotate(this.mvMatrix, this.mvMatrix, this.rotation.z / 360.0 * 6.28318531, [0, 0, 1]);
+
+    gl.uniformMatrix4fv(
+      programInfo.uniformLocations.projectionMatrix, false, this.projMatrix
+    );
+    
+    cube.draw(gl, programInfo, this.mvMatrix, window.forceSelectMode || selectMode);
+    
+    if (this.cube.isEditing())
+      this.drawArrowsOnBlock(gl, programInfo, selectMode);
+    else
+      this.drawArrowsOnCube(gl, programInfo, selectMode);
+  }
+
   static initBuffers(gl) {
     const posBuffer = gl.createBuffer();
     const position = [
-       1.5,  0.5,  0.51,
-       0.5,  0.5,  0.51,
-       0.5, -0.5,  0.51,
-       1.5, -0.5,  0.51
+       1.5,  0.5,  0.5,
+       0.5,  0.5,  0.5,
+       0.5, -0.5,  0.5,
+       1.5, -0.5,  0.5
     ];
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(position), gl.STATIC_DRAW);
@@ -396,10 +538,10 @@ export default class CubeCanvas {
         1, 1, 1, 1,
         1, 1, 1, 1
       ],[
-        1, 1, 1, 0.2,
-        1, 1, 1, 0.2,
-        1, 1, 1, 0.2,
-        1, 1, 1, 0.2
+        1, 1, 1, 0.4,
+        1, 1, 1, 0.4,
+        1, 1, 1, 0.4,
+        1, 1, 1, 0.4
       ]
     ];
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers.opaque);
