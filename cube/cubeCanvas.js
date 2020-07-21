@@ -71,7 +71,6 @@ export default class CubeCanvas {
       state: CubeCanvas.MOUSE_UP
     };
     this.selected = null;
-    this.mouseEnabled = true;
 
     this.glWindow = new GlWindow(this.canvas);
     this.gl = this.glWindow.gl;
@@ -96,8 +95,6 @@ export default class CubeCanvas {
     Block.setTextures(this.textures);
   }
 
-  setMouseEnabled(flag) { this.mouseEnabled = flag; }
-
   mouseDown = (e) => {
     var rect = this.canvas.getBoundingClientRect();
     let c = {
@@ -105,14 +102,13 @@ export default class CubeCanvas {
       y: e.clientY - rect.top
     };
 
-    if (this.mouseEnabled && !this.cube.isMoving()) {
-      this.mouse = {
-        x: c.x,
-        y: c.y,
-        state: CubeCanvas.MOUSE_DOWN
-      }
-      console.log(this.mouse);
-      
+    this.mouse = {
+      x: c.x,
+      y: c.y,
+      state: CubeCanvas.MOUSE_DOWN
+    }
+
+    if (!this.cube.isMoving()) {
       this.draw(this.gl, this.glWindow.programInfo, 0, true);
       var pixels = new Uint8Array(4);
       this.gl.readPixels(c.x, this.canvas.height - c.y, 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
@@ -135,7 +131,7 @@ export default class CubeCanvas {
   mouseUp = (e) => {
     this.mouse.state = CubeCanvas.MOUSE_UP;
 
-    if (this.mouseEnabled && !this.cube.isMoving() && this.selected) {
+    if (!this.cube.isMoving() && this.selected) {
       if (this.selected.highlight >= 0) {
         this.cube.setSolving(false);
         this.cube.clearUndo();
@@ -215,7 +211,7 @@ export default class CubeCanvas {
       y: e.clientY - rect.top
     };
 
-    if (!this.mouseEnabled || this.cube.isMoving() || !this.selected) {
+    if (this.cube.isMoving() || !this.selected) {
       if (this.mouse.state === CubeCanvas.MOUSE_DOWN) {
         this.rotation.x += c.y - this.mouse.y;
         if (this.rotation.x < -80) this.rotation.x = -80;
@@ -226,9 +222,7 @@ export default class CubeCanvas {
 
       this.mouse.x = c.x;
       this.mouse.y = c.y;
-
-      console.log(this.mouse);
-    }else if (this.mouseEnabled && !this.cube.isMoving() && this.selected) {
+    }else if (!this.cube.isMoving() && this.selected) {
       if (distance({x: this.mouse.x, y: this.mouse.y}, c) < CubeCanvas.DRAG_DEADZONE) {
         this.selected.highlight = -1;
         return;
